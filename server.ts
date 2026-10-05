@@ -45,45 +45,26 @@ interface DatabaseSchema {
     adminUsername: string;
     adminPasswordHash: string;
   };
-  categories: Array<{
-    id: string;
-    name: string;
-    slug: string;
-    icon: string;
-    description: string;
-    color: string;
-    order: number;
-  }>;
   apps: Array<{
     id: string;
     title: string;
-    tagline?: string;
-    description?: string;
     url: string;
-    category?: string;
     iconType?: 'preset' | 'image' | 'emoji';
     iconName?: string;
     iconColor?: string;
     iconUrl?: string;
-    bannerGradient?: string;
-    tags?: string[];
-    audience?: string;
-    status?: 'active' | 'beta' | 'new' | 'maintenance';
-    isFeatured?: boolean;
-    order: number;
-    embedMode?: 'new_tab' | 'iframe' | 'both';
+    order?: number;
     clicks?: number;
-    createdAt: string;
-    updatedAt: string;
+    createdAt?: string;
+    updatedAt?: string;
   }>;
-  logs: Array<{
+  logs?: Array<{
     id: string;
     action: string;
     details: string;
     targetTitle?: string;
     timestamp: string;
     ip?: string;
-    userAgent?: string;
   }>;
 }
 
@@ -91,7 +72,6 @@ function hashPassword(pass: string): string {
   return crypto.createHash('sha256').update(pass).digest('hex');
 }
 
-// Initial default database: NO webapps prefilled (apps: [])
 const INITIAL_DATABASE: DatabaseSchema = {
   settings: {
     siteName: 'SIR AMEIR PLAYGROUND',
@@ -99,7 +79,7 @@ const INITIAL_DATABASE: DatabaseSchema = {
     ownerName: 'Sir Ameir',
     ownerBio: 'Pendidik & Pembangun WebApp',
     ownerAvatar: '',
-    announcementText: 'Selamat datang ke SIR AMEIR PLAYGROUND!',
+    announcementText: '',
     announcementActive: false,
     announcementType: 'info',
     maintenanceMode: false,
@@ -109,27 +89,8 @@ const INITIAL_DATABASE: DatabaseSchema = {
     adminUsername: 'admin',
     adminPasswordHash: hashPassword('admin')
   },
-  categories: [
-    {
-      id: 'cat-all',
-      name: 'Semua WebApp',
-      slug: 'all',
-      icon: 'Gamepad2',
-      description: 'Semua koleksi webapp',
-      color: 'from-red-500 to-yellow-500',
-      order: 1
-    }
-  ],
-  apps: [], // Strictly empty as requested
-  logs: [
-    {
-      id: 'log-init',
-      action: 'SETTINGS_UPDATED',
-      details: 'Sistem SIR AMEIR PLAYGROUND dimulakan dengan pangkalan data bersih.',
-      timestamp: new Date().toISOString(),
-      ip: '127.0.0.1'
-    }
-  ]
+  apps: [],
+  logs: []
 };
 
 function readDatabase(): DatabaseSchema {
@@ -141,12 +102,7 @@ function readDatabase(): DatabaseSchema {
     const data = fs.readFileSync(DB_FILE, 'utf-8');
     const parsed = JSON.parse(data);
     if (!parsed.settings) parsed.settings = INITIAL_DATABASE.settings;
-    if (!parsed.categories) parsed.categories = INITIAL_DATABASE.categories;
-    if (!parsed.apps) parsed.apps = [];
-    if (!parsed.logs) parsed.logs = INITIAL_DATABASE.logs;
-
-    parsed.settings.siteName = 'SIR AMEIR PLAYGROUND';
-    parsed.settings.footerText = '© SIR AMEIR PLAYGROUND';
+    if (!Array.isArray(parsed.apps)) parsed.apps = [];
     if (!parsed.settings.adminUsername) parsed.settings.adminUsername = 'admin';
 
     return parsed;
@@ -164,26 +120,11 @@ function saveDatabase(db: DatabaseSchema): void {
   }
 }
 
-function logActivity(action: string, details: string, targetTitle?: string, req?: Request) {
-  const db = readDatabase();
-  const newLog = {
-    id: 'log-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
-    action,
-    details,
-    targetTitle,
-    timestamp: new Date().toISOString(),
-    ip: req ? (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || 'unknown') : 'system'
-  };
-  db.logs.unshift(newLog);
-  if (db.logs.length > 200) db.logs = db.logs.slice(0, 200);
-  saveDatabase(db);
-}
-
 const activeSessions = new Map<string, { username: string; role: string; expiresAt: number }>();
 
 function createSessionToken(username: string): string {
   const token = crypto.randomBytes(32).toString('hex');
-  const expiresAt = Date.now() + 1000 * 60 * 60 * 24 * 7;
+  const expiresAt = Date.now() + 1000 * 60 * 60 * 24 * 30; // 30 days
   activeSessions.set(token, { username, role: 'admin', expiresAt });
   return token;
 }
@@ -206,19 +147,11 @@ function requireAdminAuth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-// Overwrite existing database file to ensure no auto-filled webapps exist on first start
-saveDatabase(INITIAL_DATABASE);
-
 // API Routes
 app.get('/api/settings', (req: Request, res: Response) => {
   const db = readDatabase();
   const { adminPasswordHash, ...publicSettings } = db.settings;
   res.json(publicSettings);
-});
-
-app.get('/api/categories', (req: Request, res: Response) => {
-  const db = readDatabase();
-  res.json(db.categories.sort((a, b) => a.order - b.order));
 });
 
 app.get('/api/apps', (req: Request, res: Response) => {
@@ -240,7 +173,6 @@ app.post('/api/apps/:id/click', (req: Request, res: Response) => {
 
   appItem.clicks = (appItem.clicks || 0) + 1;
   saveDatabase(db);
-  logActivity('APP_CLICK', `WebApp "${appItem.title}" dibuka`, appItem.title, req);
   res.json({ success: true, clicks: appItem.clicks });
 });
 
@@ -261,8 +193,6 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
   }
 
   const token = createSessionToken('admin');
-  logActivity('ADMIN_LOGIN', 'Pentadbir berjaya log masuk.', undefined, req);
-
   res.json({
     success: true,
     token,
@@ -341,7 +271,6 @@ app.post('/api/apps', requireAdminAuth, (req: Request, res: Response) => {
 
   db.apps.push(newApp);
   saveDatabase(db);
-  logActivity('APP_ADDED', `WebApp baru ditambah: "${newApp.title}"`, newApp.title, req);
 
   res.status(201).json(newApp);
 });
@@ -365,7 +294,6 @@ app.put('/api/apps/:id', requireAdminAuth, (req: Request, res: Response) => {
 
   db.apps[index] = updated;
   saveDatabase(db);
-  logActivity('APP_UPDATED', `WebApp dikemaskini: "${updated.title}"`, updated.title, req);
 
   res.json(updated);
 });
@@ -381,7 +309,6 @@ app.delete('/api/apps/:id', requireAdminAuth, (req: Request, res: Response) => {
 
   db.apps = db.apps.filter(a => a.id !== req.params.id);
   saveDatabase(db);
-  logActivity('APP_DELETED', `WebApp dipadam: "${appItem.title}"`, appItem.title, req);
 
   res.json({ success: true, message: `"${appItem.title}" berjaya dipadam.` });
 });
@@ -427,25 +354,44 @@ app.put('/api/settings', requireAdminAuth, (req: Request, res: Response) => {
   }
 
   saveDatabase(db);
-  logActivity('SETTINGS_UPDATED', 'Tetapan disimpan.', undefined, req);
 
   const { adminPasswordHash, ...publicSettings } = db.settings;
   res.json(publicSettings);
 });
 
-// Admin Logs
-app.get('/api/logs', requireAdminAuth, (req: Request, res: Response) => {
+// Export Backup Endpoint
+app.get('/api/backup/export', requireAdminAuth, (req: Request, res: Response) => {
   const db = readDatabase();
-  res.json(db.logs);
+  const { adminPasswordHash, ...safeSettings } = db.settings;
+  const exportData = {
+    siteName: 'SIR AMEIR PLAYGROUND',
+    settings: safeSettings,
+    apps: db.apps,
+    exportedAt: new Date().toISOString()
+  };
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Content-Disposition', `attachment; filename=sir-ameir-playground-backup.json`);
+  res.send(JSON.stringify(exportData, null, 2));
 });
 
-// Admin Stats
-app.get('/api/stats', requireAdminAuth, (req: Request, res: Response) => {
+// Import Backup Endpoint
+app.post('/api/backup/import', requireAdminAuth, (req: Request, res: Response) => {
+  const { backupData } = req.body;
+  if (!backupData || !Array.isArray(backupData.apps)) {
+    return res.status(400).json({ error: 'Fail sandaran tidak sah.' });
+  }
+
   const db = readDatabase();
-  res.json({
-    totalApps: db.apps.length,
-    totalClicks: db.apps.reduce((sum, a) => sum + (a.clicks || 0), 0)
-  });
+  db.apps = backupData.apps;
+  if (backupData.settings) {
+    db.settings = {
+      ...db.settings,
+      ...backupData.settings,
+      adminPasswordHash: db.settings.adminPasswordHash
+    };
+  }
+  saveDatabase(db);
+  res.json({ success: true, count: db.apps.length });
 });
 
 async function startServer() {

@@ -10,9 +10,18 @@ import { LoginModal } from './components/Admin/LoginModal';
 import { Footer } from './components/Footer';
 import { OfflineIndicator } from './components/OfflineIndicator';
 
+const LOCAL_STORAGE_APPS_KEY = 'sir_ameir_cached_apps';
+
 export default function App() {
-  // Data States (Clean initial state - no auto-filled webapps)
-  const [apps, setApps] = useState<WebApp[]>([]);
+  const [apps, setApps] = useState<WebApp[]>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_APPS_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
   const [settings, setSettings] = useState<WebsiteSettings>({
     siteName: 'SIR AMEIR PLAYGROUND',
     tagline: 'All my educational and interactive webapps in one place.',
@@ -28,20 +37,17 @@ export default function App() {
     adminUsername: 'admin'
   });
 
-  // Modal States
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isAppFormOpen, setIsAppFormOpen] = useState(false);
   const [editingApp, setEditingApp] = useState<WebApp | null>(null);
 
-  // Auth State
   const [authState, setAuthState] = useState<AuthState>({
     isAuthenticated: false,
     token: null,
     user: null
   });
 
-  // 5-Click Secret Admin Counter
   const clickCountRef = useRef(0);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -66,14 +72,40 @@ export default function App() {
     }
   };
 
+  const saveAppsState = (newApps: WebApp[]) => {
+    setApps(newApps);
+    try {
+      localStorage.setItem(LOCAL_STORAGE_APPS_KEY, JSON.stringify(newApps));
+    } catch (e) {
+      console.warn('LocalStorage save error:', e);
+    }
+  };
+
   const loadData = async () => {
     try {
-      const [settingsData, appsData] = await Promise.all([
-        api.getSettings(),
-        api.getApps()
+      const [settingsData, serverApps] = await Promise.all([
+        api.getSettings().catch(() => settings),
+        api.getApps().catch(() => null)
       ]);
-      setSettings(settingsData);
-      setApps(appsData);
+
+      if (settingsData) setSettings(settingsData);
+
+      if (serverApps && Array.isArray(serverApps)) {
+        if (serverApps.length > 0) {
+          saveAppsState(serverApps);
+        } else {
+          // If server returned empty, check if we have cached apps to restore
+          const cached = localStorage.getItem(LOCAL_STORAGE_APPS_KEY);
+          if (cached) {
+            try {
+              const parsed = JSON.parse(cached);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                setApps(parsed);
+              }
+            } catch {}
+          }
+        }
+      }
 
       const savedToken = authStorage.getToken();
       if (savedToken) {
@@ -85,11 +117,9 @@ export default function App() {
               token: savedToken,
               user: authRes.user
             });
-          } else {
-            authStorage.clearToken();
           }
         } catch {
-          authStorage.clearToken();
+          // keep token if offline
         }
       }
     } catch (err) {
@@ -102,7 +132,6 @@ export default function App() {
     document.title = 'SIR AMEIR PLAYGROUND';
   }, []);
 
-  // Launch App -> Direct Redirect
   const handleLaunchApp = (app: WebApp) => {
     api.recordClick(app.id).catch(() => {});
     if (app.url) {
@@ -110,32 +139,86 @@ export default function App() {
     }
   };
 
-  // Admin Mutations
   const handleSaveApp = async (appData: Partial<WebApp>) => {
     if (editingApp) {
-      const updated = await api.updateApp(editingApp.id, appData);
-      setApps(prev => prev.map(a => a.id === editingApp.id ? updated : a));
+      try {
+        const updated = await api.updateApp(editingApp.id, appData);
+        const newApps = apps.map(a => a.id === editingApp.id ? updated : a);
+        saveAppsState(newApps);
+      } catch {
+        const updated: WebApp = {
+          ...editingApp,
+          ...appData as any,
+          updatedAt: new Date().toISOString()
+        };
+        const newApps = apps.map(a => a.id === editingApp.id ? updated : a);
+        saveAppsState(newApps);
+      }
     } else {
-      const created = await api.createApp(appData);
-      setApps(prev => [...prev, created]);
+      try {
+        const created = await api.createApp(appData);
+        const newApps = [...apps, created];
+        saveAppsState(newApps);
+      } catch {
+        const created: WebApp = {
+          id: 'app-' + Date.now(),
+          title: appData.title || '',
+          url: appData.url || '',
+          iconType: appData.iconType || 'preset',
+          iconName: appData.iconName || 'Gamepad2',
+          iconColor: appData.iconColor || 'red',
+          iconUrl: appData.iconUrl,
+          order: apps.length + 1,
+          createdAt: new Date().toISOString()
+        };
+        const newApps = [...apps, created];
+        saveAppsState(newApps);
+      }
     }
   };
 
   const handleDeleteApp = async (id: string) => {
-    await api.deleteApp(id);
-    setApps(prev => prev.filter(a => a.id !== id));
+    try {
+      await api.deleteApp(id);
+    } catch {}
+    const newApps = apps.filter(a => a.id !== id);
+    saveAppsState(newApps);
   };
 
   const handleReorderApps = async (appIds: string[]) => {
-    const res = await api.reorderApps(appIds);
-    if (res.success) {
-      setApps(res.apps);
+    const appMap = new Map(apps.map(a => [a.id, a]));
+    const reordered: WebApp[] = [];
+    appIds.forEach((id, index) => {
+      const item = appMap.get(id);
+      if (item) {
+        item.order = index + 1;
+        reordered.push(item);
+        appMap.delete(id);
+      }
+    });
+    appMap.forEach(item => reordered.push(item));
+    saveAppsState(reordered);
+    try {
+      await api.reorderApps(appIds);
+    } catch {}
+  };
+
+  const handleImportBackup = async (importedApps: WebApp[]) => {
+    saveAppsState(importedApps);
+    for (const appItem of importedApps) {
+      try {
+        await api.createApp(appItem);
+      } catch {}
     }
   };
 
   const handleSaveSettings = async (newSettings: Partial<WebsiteSettings> & { newPassword?: string }) => {
-    const updated = await api.updateSettings(newSettings);
-    setSettings(prev => ({ ...prev, ...updated }));
+    try {
+      const updated = await api.updateSettings(newSettings);
+      setSettings(prev => ({ ...prev, ...updated }));
+    } catch {
+      setSettings(prev => ({ ...prev, ...newSettings }));
+    }
   };
 
   const handleLogout = async () => {
@@ -189,7 +272,7 @@ export default function App() {
       {/* Offline Indicator */}
       <OfflineIndicator />
 
-      {/* Admin Login Modal (Triggered after 5 clicks on title) */}
+      {/* Admin Login Modal (Triggered by 5-clicks on title) */}
       <LoginModal
         isOpen={isLoginOpen}
         onClose={() => setIsLoginOpen(false)}
@@ -199,7 +282,7 @@ export default function App() {
         }}
       />
 
-      {/* Admin Management Dashboard */}
+      {/* Admin Dashboard */}
       <AdminDashboard
         isOpen={isAdminOpen}
         onClose={() => setIsAdminOpen(false)}
@@ -218,6 +301,7 @@ export default function App() {
         onDeleteApp={handleDeleteApp}
         onReorderApps={handleReorderApps}
         onSaveSettings={handleSaveSettings}
+        onImportBackup={handleImportBackup}
       />
 
       {/* Add / Edit WebApp Modal */}

@@ -9,7 +9,8 @@ import {
   ExternalLink,
   ShieldCheck,
   LogOut,
-  Sparkles,
+  Download,
+  Upload,
   Gamepad2,
   CheckCircle2
 } from 'lucide-react';
@@ -28,6 +29,7 @@ interface AdminDashboardProps {
   onDeleteApp: (id: string) => Promise<void>;
   onReorderApps: (appIds: string[]) => Promise<void>;
   onSaveSettings: (settings: Partial<WebsiteSettings> & { newPassword?: string }) => Promise<void>;
+  onImportBackup?: (apps: WebApp[]) => Promise<void>;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -41,7 +43,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onOpenEditApp,
   onDeleteApp,
   onReorderApps,
-  onSaveSettings
+  onSaveSettings,
+  onImportBackup
 }) => {
   const [activeTab, setActiveTab] = useState<'apps' | 'settings'>('apps');
   const [siteTagline, setSiteTagline] = useState(settings.tagline || '');
@@ -61,6 +64,43 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     const appIds = newApps.map(a => a.id);
     await onReorderApps(appIds);
+  };
+
+  const handleExport = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(apps, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `sir-ameir-playground-apps-${new Date().toISOString().split('T')[0]}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    setNotice('Fail sandaran webapp berjaya dimuat turun!');
+    setTimeout(() => setNotice(null), 3000);
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        const importedApps = Array.isArray(json) ? json : json.apps;
+        if (!Array.isArray(importedApps)) {
+          alert('Format fail JSON tidak sah.');
+          return;
+        }
+        if (onImportBackup) {
+          await onImportBackup(importedApps);
+          setNotice(`Berjaya memuat naik ${importedApps.length} webapp!`);
+          setTimeout(() => setNotice(null), 3000);
+        }
+      } catch (err: any) {
+        alert('Ralat membaca fail: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleSaveSiteSettings = async (e: React.FormEvent) => {
@@ -120,24 +160,44 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
 
         {/* Tab Buttons */}
-        <div className="flex items-center gap-2 px-6 py-3 bg-amber-50 border-b-2 border-yellow-300">
-          <button
-            onClick={() => setActiveTab('apps')}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition ${
-              activeTab === 'apps' ? 'bg-red-600 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-yellow-100 border border-yellow-300'
-            }`}
-          >
-            Senarai WebApp ({apps.length})
-          </button>
+        <div className="flex items-center justify-between px-6 py-3 bg-amber-50 border-b-2 border-yellow-300">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab('apps')}
+              className={`px-4 py-2 rounded-xl text-xs font-black transition ${
+                activeTab === 'apps' ? 'bg-red-600 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-yellow-100 border border-yellow-300'
+              }`}
+            >
+              Senarai WebApp ({apps.length})
+            </button>
 
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition ${
-              activeTab === 'settings' ? 'bg-red-600 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-yellow-100 border border-yellow-300'
-            }`}
-          >
-            Tetapan & Password
-          </button>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`px-4 py-2 rounded-xl text-xs font-black transition ${
+                activeTab === 'settings' ? 'bg-red-600 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-yellow-100 border border-yellow-300'
+              }`}
+            >
+              Tetapan & Password
+            </button>
+          </div>
+
+          {/* Backup Export / Import */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white hover:bg-yellow-100 text-slate-800 border border-yellow-300 text-xs font-bold transition shadow-sm"
+              title="Muat turun fail sandaran JSON untuk disimpan"
+            >
+              <Download className="w-3.5 h-3.5 text-red-600" />
+              <span className="hidden sm:inline">Eksport Sandaran</span>
+            </button>
+
+            <label className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white hover:bg-yellow-100 text-slate-800 border border-yellow-300 text-xs font-bold transition shadow-sm cursor-pointer">
+              <Upload className="w-3.5 h-3.5 text-yellow-600" />
+              <span className="hidden sm:inline">Import Sandaran</span>
+              <input type="file" accept=".json" onChange={handleImport} className="hidden" />
+            </label>
+          </div>
         </div>
 
         {/* Tab Contents */}
@@ -154,7 +214,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-700 uppercase tracking-wider font-mono">
-                  Pengurusan WebApp ({apps.length})
+                  Koleksi WebApp ({apps.length})
                 </span>
 
                 <button
@@ -170,7 +230,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="py-12 text-center bg-white rounded-2xl border-2 border-dashed border-yellow-300 p-6">
                   <Gamepad2 className="w-10 h-10 text-yellow-500 mx-auto mb-2" />
                   <p className="text-sm font-bold text-slate-700">Belum ada webapp dalam senarai.</p>
-                  <p className="text-xs text-slate-500 mt-1">Tekan butang "Tambah WebApp Baru" di atas untuk memasukkan webapp pertama anda.</p>
+                  <p className="text-xs text-slate-500 mt-1">Tekan butang "Tambah WebApp Baru" di atas untuk memasukkan webapp anda.</p>
                 </div>
               ) : (
                 <div className="divide-y divide-yellow-200 bg-white rounded-2xl border-2 border-yellow-300 overflow-hidden shadow-sm">
