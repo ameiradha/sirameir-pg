@@ -115,6 +115,10 @@ function readDatabase(): DatabaseSchema {
 function saveDatabase(db: DatabaseSchema): void {
   try {
     fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf-8');
+    const defaultAppsPath = path.resolve('src/data/defaultApps.json');
+    if (fs.existsSync(path.dirname(defaultAppsPath))) {
+      fs.writeFileSync(defaultAppsPath, JSON.stringify(db.apps, null, 2), 'utf-8');
+    }
   } catch (err) {
     console.error('Error saving database:', err);
   }

@@ -15,7 +15,11 @@ import {
   Check,
   Gamepad2,
   CheckCircle2,
-  Info
+  Info,
+  FileCode,
+  ClipboardPaste,
+  AlertTriangle,
+  RotateCcw
 } from 'lucide-react';
 import { WebApp, WebsiteSettings, AuthState } from '../../types';
 import { AppIcon } from '../../lib/iconHelper';
@@ -32,7 +36,7 @@ interface AdminDashboardProps {
   onDeleteApp: (id: string) => Promise<void>;
   onReorderApps: (appIds: string[]) => Promise<void>;
   onSaveSettings: (settings: Partial<WebsiteSettings> & { newPassword?: string }) => Promise<void>;
-  onImportBackup?: (apps: WebApp[]) => Promise<void>;
+  onImportBackup?: (apps: WebApp[], replace?: boolean) => Promise<void>;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -49,12 +53,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onSaveSettings,
   onImportBackup
 }) => {
-  const [activeTab, setActiveTab] = useState<'apps' | 'settings'>('apps');
+  const [activeTab, setActiveTab] = useState<'apps' | 'json' | 'settings'>('apps');
   const [siteTagline, setSiteTagline] = useState(settings.tagline || '');
   const [newPassword, setNewPassword] = useState('');
   const [savingSettings, setSavingSettings] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // JSON Import States
+  const [jsonInput, setJsonInput] = useState('');
+  const [jsonError, setJsonError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
 
   if (!isOpen) return null;
 
@@ -92,24 +101,76 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }, 3000);
   };
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        setJsonInput(text);
+        validateJson(text);
+      }
+    } catch {
+      alert('Sila gunakan pintasan Ctrl+V atau klik kanan untuk Paste ke dalam ruangan.');
+    }
+  };
+
+  const validateJson = (text: string): WebApp[] | null => {
+    if (!text.trim()) {
+      setJsonError(null);
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(text);
+      const list = Array.isArray(parsed) ? parsed : parsed.apps;
+      if (!Array.isArray(list)) {
+        setJsonError('Format JSON mestilah berbentuk senarai/array [ { ... } ]');
+        return null;
+      }
+      setJsonError(null);
+      return list;
+    } catch (err: any) {
+      setJsonError('Ralat sintaks JSON: ' + err.message);
+      return null;
+    }
+  };
+
+  const handleExecuteImport = async (replaceMode: boolean) => {
+    const validList = validateJson(jsonInput);
+    if (!validList) {
+      if (!jsonInput.trim()) {
+        alert('Sila paste atau taip kod JSON terlebih dahulu.');
+      }
+      return;
+    }
+
+    setImporting(true);
+    try {
+      if (onImportBackup) {
+        await onImportBackup(validList, replaceMode);
+        setNotice(
+          replaceMode
+            ? `Berjaya menggantikan senarai dengan ${validList.length} webapp!`
+            : `Berjaya menambah ${validList.length} webapp ke senarai sedia ada!`
+        );
+        setActiveTab('apps');
+        setTimeout(() => setNotice(null), 3500);
+      }
+    } catch (err: any) {
+      alert('Ralat semasa import: ' + err.message);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
-        const json = JSON.parse(event.target?.result as string);
-        const importedApps = Array.isArray(json) ? json : json.apps;
-        if (!Array.isArray(importedApps)) {
-          alert('Format fail JSON tidak sah.');
-          return;
-        }
-        if (onImportBackup) {
-          await onImportBackup(importedApps);
-          setNotice(`Berjaya memuat naik ${importedApps.length} webapp!`);
-          setTimeout(() => setNotice(null), 3000);
-        }
+        const text = event.target?.result as string;
+        setJsonInput(text);
+        validateJson(text);
       } catch (err: any) {
         alert('Ralat membaca fail: ' + err.message);
       }
@@ -137,7 +198,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-3 sm:p-6 animate-fadeIn">
-      <div className="relative flex flex-col w-full max-w-4xl h-full max-h-[90vh] rounded-3xl bg-white border-4 border-yellow-400 shadow-2xl overflow-hidden text-slate-900">
+      <div className="relative flex flex-col w-full max-w-4xl h-full max-h-[92vh] rounded-3xl bg-white border-4 border-yellow-400 shadow-2xl overflow-hidden text-slate-900">
         
         {/* Header Bar */}
         <div className="flex items-center justify-between px-6 py-4 bg-red-600 text-white">
@@ -173,7 +234,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         </div>
 
-        {/* Tab Buttons */}
+        {/* Tab Buttons & Action Bar */}
         <div className="flex flex-wrap items-center justify-between px-6 py-3 bg-amber-50 border-b-2 border-yellow-300 gap-2">
           <div className="flex items-center gap-2">
             <button
@@ -186,6 +247,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
 
             <button
+              onClick={() => {
+                setActiveTab('json');
+                if (!jsonInput.trim()) {
+                  setJsonInput(JSON.stringify(apps, null, 2));
+                }
+              }}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black transition ${
+                activeTab === 'json' ? 'bg-red-600 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-yellow-100 border border-yellow-300'
+              }`}
+            >
+              <FileCode className="w-4 h-4" />
+              <span>Paste & Import JSON</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('settings')}
               className={`px-4 py-2 rounded-xl text-xs font-black transition ${
                 activeTab === 'settings' ? 'bg-red-600 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-yellow-100 border border-yellow-300'
@@ -195,8 +271,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
           </div>
 
-          {/* Backup & Portability Actions */}
+          {/* Quick Actions */}
           <div className="flex items-center gap-2">
+            <button
+              onClick={async () => {
+                setNotice('Sedang menyegerakkan ke cloud...');
+                await onReorderApps(apps.map(a => a.id));
+                setNotice('Berjaya disegerakkan dengan Vercel & semua peranti!');
+                setTimeout(() => setNotice(null), 3500);
+              }}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-yellow-950 border border-yellow-500 text-xs font-bold transition shadow-sm active:scale-95"
+              title="Segerak senarai aplikasi ke cloud sekarang supaya Vercel & telefon menerima kemaskini"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 text-red-700" />
+              <span>Segerak Cloud</span>
+            </button>
+
             <button
               onClick={handleCopyJSON}
               className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white hover:bg-yellow-100 text-slate-800 border border-yellow-300 text-xs font-bold transition shadow-sm"
@@ -214,12 +304,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <Download className="w-3.5 h-3.5 text-red-600" />
               <span>Eksport JSON</span>
             </button>
-
-            <label className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white hover:bg-yellow-100 text-slate-800 border border-yellow-300 text-xs font-bold transition shadow-sm cursor-pointer">
-              <Upload className="w-3.5 h-3.5 text-yellow-600" />
-              <span>Import Sandaran</span>
-              <input type="file" accept=".json" onChange={handleImport} className="hidden" />
-            </label>
           </div>
         </div>
 
@@ -233,6 +317,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           )}
 
+          {/* TAB 1: SENARAI WEBAPP */}
           {activeTab === 'apps' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -249,19 +334,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </button>
               </div>
 
-              {/* Vercel Tip Notice */}
-              <div className="p-3.5 rounded-2xl bg-amber-50 border border-yellow-300 text-xs text-yellow-900 flex items-start gap-2.5">
-                <Info className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                <div className="leading-relaxed">
-                  <strong>Peringatan Vercel:</strong> Semua webapp yang anda tambah atau padam di sini disimpan terus ke memori peranti anda. Anda juga boleh menekan butang <strong>"Eksport JSON"</strong> atau <strong>"Salin JSON"</strong> di bahagian atas untuk memindahkan senarai aplikasi ke mana-mana komputer, telefon pintar, atau fail projek Vercel bila-bila masa!
-                </div>
-              </div>
-
               {apps.length === 0 ? (
                 <div className="py-12 text-center bg-white rounded-2xl border-2 border-dashed border-yellow-300 p-6">
                   <Gamepad2 className="w-10 h-10 text-yellow-500 mx-auto mb-2" />
                   <p className="text-sm font-bold text-slate-700">Belum ada webapp dalam senarai.</p>
-                  <p className="text-xs text-slate-500 mt-1">Tekan butang "Tambah WebApp Baru" di atas untuk memasukkan webapp anda.</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Anda boleh tekan "Tambah WebApp Baru" atau guna tab <strong>"Paste & Import JSON"</strong> untuk memuat naik senarai secara pukal.
+                  </p>
                 </div>
               ) : (
                 <div className="divide-y divide-yellow-200 bg-white rounded-2xl border-2 border-yellow-300 overflow-hidden shadow-sm">
@@ -346,6 +425,136 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           )}
 
+          {/* TAB 2: PASTE DAN IMPORT JSON */}
+          {activeTab === 'json' && (
+            <div className="space-y-4 max-w-3xl mx-auto">
+              
+              <div className="p-4 rounded-2xl bg-white border-2 border-yellow-300 shadow-sm space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900 uppercase font-mono flex items-center gap-2">
+                      <FileCode className="w-5 h-5 text-red-600" />
+                      <span>Ruangan Paste & Import JSON WebApp</span>
+                    </h3>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Tampal (paste) kod JSON senarai webapp anda di bawah untuk dimuat naik terus ke pangkalan data.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handlePasteFromClipboard}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-yellow-950 text-xs font-bold border border-yellow-300 transition"
+                    >
+                      <ClipboardPaste className="w-3.5 h-3.5 text-red-600" />
+                      <span>Tampal (Paste)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setJsonInput(JSON.stringify(apps, null, 2));
+                        setJsonError(null);
+                      }}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition"
+                      title="Isikan dengan kod JSON aplikasi semasa"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Muatkan Semula Apps Semasa</span>
+                    </button>
+
+                    <label className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white hover:bg-yellow-50 text-slate-800 border border-yellow-300 text-xs font-bold transition cursor-pointer">
+                      <Upload className="w-3.5 h-3.5 text-yellow-600" />
+                      <span>Pilih Fail .JSON</span>
+                      <input type="file" accept=".json" onChange={handleImportFile} className="hidden" />
+                    </label>
+                  </div>
+                </div>
+
+                {/* JSON Textarea */}
+                <div className="relative">
+                  <textarea
+                    rows={12}
+                    value={jsonInput}
+                    onChange={(e) => {
+                      setJsonInput(e.target.value);
+                      validateJson(e.target.value);
+                    }}
+                    placeholder={`[\n  {\n    "id": "app-1",\n    "title": "Kalkulator Interaktif",\n    "url": "https://kalkulator.com",\n    "iconType": "preset",\n    "iconName": "Calculator",\n    "iconColor": "red"\n  }\n]`}
+                    className="w-full p-4 rounded-2xl bg-slate-900 text-yellow-300 font-mono text-xs leading-relaxed border-2 border-yellow-400 focus:outline-none focus:ring-2 focus:ring-red-600 selection:bg-red-600 selection:text-white"
+                    spellCheck={false}
+                  />
+                </div>
+
+                {/* Validation / Status Indicator */}
+                {jsonError ? (
+                  <div className="p-3 rounded-xl bg-red-100 border border-red-300 text-red-800 text-xs font-bold flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                    <span>{jsonError}</span>
+                  </div>
+                ) : jsonInput.trim() ? (
+                  <div className="p-3 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Sintaks JSON sah dan bersedia untuk diimport!</span>
+                  </div>
+                ) : null}
+
+                {/* Import Buttons */}
+                <div className="pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-yellow-200">
+                  <div className="text-xs text-slate-500 font-medium">
+                    Pilih sama ada untuk <strong>menggantikan semua</strong> senarai semasa atau <strong>menggabungkan</strong> dengan yang sedia ada.
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={importing || !!jsonError || !jsonInput.trim()}
+                      onClick={() => handleExecuteImport(false)}
+                      className="px-4 py-2.5 rounded-xl bg-yellow-400 hover:bg-yellow-500 text-yellow-950 font-black text-xs transition shadow-sm disabled:opacity-40 active:scale-95 flex items-center gap-1.5"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Import & Gabungkan (Merge)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={importing || !!jsonError || !jsonInput.trim()}
+                      onClick={() => {
+                        if (apps.length > 0) {
+                          if (!confirm(`Tindakan ini akan MENGGANTIKAN SEMUA ${apps.length} webapp sedia ada dengan senarai JSON baru ini. Teruskan?`)) {
+                            return;
+                          }
+                        }
+                        handleExecuteImport(true);
+                      }}
+                      className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs transition shadow-md disabled:opacity-40 active:scale-95 flex items-center gap-1.5"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>{importing ? 'Mengimport...' : 'Import & Gantikan Semua (Replace)'}</span>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Instructions Card */}
+              <div className="p-4 rounded-2xl bg-amber-50 border border-yellow-300 text-xs text-slate-800 space-y-1.5">
+                <p className="font-bold text-red-700 uppercase tracking-wider font-mono">
+                  Panduan Format JSON:
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-slate-700">
+                  <li>Setiap entri memerlukan sekurang-kurangnya <code>"title"</code> dan <code>"url"</code>.</li>
+                  <li>Untuk logo gambar: gunakan <code>"iconType": "image"</code> dan letakkan URL imej atau Data URL Base64 dalam <code>"iconUrl"</code>.</li>
+                  <li>Untuk ikon pratetap: gunakan <code>"iconType": "preset"</code> dan <code>"iconName"</code> (cth: <code>"Gamepad2"</code>, <code>"Calculator"</code>, <code>"Brain"</code>, <code>"Atom"</code>, dll).</li>
+                  <li>Selepas import, sistem akan menyegerakkan data secara automatik ke memori peranti dan pelayan awan.</li>
+                </ul>
+              </div>
+
+            </div>
+          )}
+
+          {/* TAB 3: TETAPAN & PASSWORD */}
           {activeTab === 'settings' && (
             <form onSubmit={handleSaveSiteSettings} className="space-y-4 max-w-lg bg-white p-6 rounded-2xl border-2 border-yellow-300 shadow-sm">
               <div>

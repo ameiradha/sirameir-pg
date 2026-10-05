@@ -232,7 +232,9 @@ export const AppFormModal: React.FC<AppFormModalProps> = ({
                     className="text-xs text-slate-700 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-red-600 file:text-white hover:file:bg-red-700 cursor-pointer"
                   />
                   {iconUrl && (
-                    <img src={iconUrl} alt="Preview" className="w-12 h-12 rounded-xl object-contain bg-white border border-yellow-400 p-1" />
+                    <div className="w-14 h-14 rounded-2xl bg-white border-2 border-yellow-400 overflow-hidden shadow-sm shrink-0 p-0 flex items-center justify-center">
+                      <img src={iconUrl} alt="Preview" className="w-full h-full object-cover block" />
+                    </div>
                   )}
                 </div>
                 <input

@@ -203,12 +203,13 @@ export default function App() {
     } catch {}
   };
 
-  const handleImportBackup = async (importedApps: WebApp[]) => {
-    saveAppsState(importedApps);
-    for (const appItem of importedApps) {
-      try {
-        await api.createApp(appItem);
-      } catch {}
+  const handleImportBackup = async (importedApps: WebApp[], replace: boolean = true) => {
+    try {
+      const finalApps = await api.importApps(importedApps, replace);
+      saveAppsState(finalApps);
+    } catch (e) {
+      console.error('Import error:', e);
+      saveAppsState(importedApps);
     }
   };
 

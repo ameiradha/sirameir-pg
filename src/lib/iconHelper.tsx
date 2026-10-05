@@ -105,26 +105,38 @@ export const AppIcon: React.FC<AppIconProps> = ({
   className = '',
   size = 'md'
 }) => {
-  const sizeClasses = {
-    sm: 'w-10 h-10 p-2 rounded-xl text-sm',
-    md: 'w-14 h-14 p-3 rounded-2xl text-xl',
-    lg: 'w-20 h-20 p-4 rounded-3xl text-3xl',
-    xl: 'w-24 h-24 p-5 rounded-3xl text-4xl'
+  const containerDimensions = {
+    sm: 'w-11 h-11 rounded-xl',
+    md: 'w-16 h-16 rounded-2xl',
+    lg: 'w-24 h-24 rounded-2xl',
+    xl: 'w-28 h-28 rounded-3xl'
+  }[size];
+
+  const presetPaddingAndFont = {
+    sm: 'p-2 text-sm',
+    md: 'p-3 text-xl',
+    lg: 'p-4 text-3xl',
+    xl: 'p-5 text-4xl'
   }[size];
 
   const iconSizes = {
     sm: 'w-5 h-5',
-    md: 'w-7 h-7',
-    lg: 'w-10 h-10',
-    xl: 'w-12 h-12'
+    md: 'w-8 h-8',
+    lg: 'w-12 h-12',
+    xl: 'w-14 h-14'
   }[size];
 
   const colorStyle = COLOR_VARIANTS[color] || COLOR_VARIANTS.red;
 
+  // For custom uploaded image logo: MUST fit and fill the white square completely (p-0, object-cover, full bleed)
   if (iconType === 'image' && iconUrl) {
     return (
-      <div className={`relative overflow-hidden flex items-center justify-center bg-white border border-slate-200 shadow-sm ${sizeClasses} ${className}`}>
-        <img src={iconUrl} alt="Logo" className="w-full h-full object-contain" />
+      <div className={`relative overflow-hidden flex items-center justify-center bg-white border-2 border-yellow-400 shadow-md ${containerDimensions} ${className}`}>
+        <img
+          src={iconUrl}
+          alt="Logo WebApp"
+          className="w-full h-full object-cover rounded-[inherit] block select-none"
+        />
       </div>
     );
   }
@@ -132,7 +144,7 @@ export const AppIcon: React.FC<AppIconProps> = ({
   const IconComponent = ICON_MAP[name] || Gamepad2;
 
   return (
-    <div className={`relative flex items-center justify-center border transition-all ${colorStyle.bg} ${colorStyle.ring} ${sizeClasses} ${className}`}>
+    <div className={`relative flex items-center justify-center border transition-all ${colorStyle.bg} ${colorStyle.ring} ${containerDimensions} ${presetPaddingAndFont} ${className}`}>
       <IconComponent className={`${iconSizes} ${colorStyle.text}`} />
     </div>
   );

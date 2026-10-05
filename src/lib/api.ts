@@ -1,5 +1,6 @@
 import { WebApp, WebsiteSettings } from '../types';
 import defaultAppsList from '../data/defaultApps.json';
+import { cloudSync } from './cloudSync';
 
 const TOKEN_KEY = 'sir_ameir_playground_token';
 const APPS_STORAGE_KEY = 'sir_ameir_cached_apps';
@@ -14,7 +15,6 @@ export const authStorage = {
   setStoredPass: (pass: string) => localStorage.setItem(PASS_STORAGE_KEY, pass),
 };
 
-// Helper to get local apps
 export function getLocalApps(): WebApp[] {
   try {
     const raw = localStorage.getItem(APPS_STORAGE_KEY);
@@ -110,26 +110,42 @@ export const api = {
     }
   },
 
+  // Get apps with automatic Cloud Sync between Vercel and AI Studio
   getApps: async (): Promise<WebApp[]> => {
+    // 1. Try global cloud database first (guarantees sync between Vercel and AI Studio)
+    try {
+      const cloudApps = await cloudSync.fetchFromCloud();
+      if (cloudApps && Array.isArray(cloudApps) && cloudApps.length > 0) {
+        saveLocalApps(cloudApps);
+        // Also update local backend if present
+        fetchJson('/api/apps/reorder', {
+          method: 'POST',
+          body: JSON.stringify({ appIds: cloudApps.map(a => a.id) })
+        }).catch(() => {});
+        return cloudApps;
+      }
+    } catch {
+      // ignore
+    }
+
+    // 2. Try local backend
     try {
       const apps = await fetchJson<WebApp[]>('/api/apps');
-      if (Array.isArray(apps)) {
-        // If server responded with apps, save local cache
-        if (apps.length > 0) {
-          saveLocalApps(apps);
-          return apps;
-        } else {
-          // If server is clean empty, check if we have local saved apps
-          const local = getLocalApps();
-          if (local.length > 0) return local;
-          return [];
-        }
+      if (Array.isArray(apps) && apps.length > 0) {
+        saveLocalApps(apps);
+        cloudSync.saveToCloud(apps).catch(() => {});
+        return apps;
       }
-      return getLocalApps();
     } catch {
-      // Offline / Vercel fallback
-      return getLocalApps();
+      // ignore
     }
+
+    // 3. Fallback to cached local apps or default catalogue
+    const local = getLocalApps();
+    if (local.length > 0) {
+      cloudSync.saveToCloud(local).catch(() => {});
+    }
+    return local;
   },
 
   recordClick: async (id: string): Promise<{ success: boolean; clicks: number }> => {
@@ -152,7 +168,6 @@ export const api = {
     const cleanUser = (username || '').trim();
     const cleanPass = (passcode || '').trim();
 
-    // 1. Try server endpoint first
     try {
       const res = await fetchJson<{ success: boolean; token: string; user: any }>('/api/auth/login', {
         method: 'POST',
@@ -162,12 +177,10 @@ export const api = {
         authStorage.setToken(res.token);
         return res;
       }
-    } catch (err: any) {
-      // If server explicitly said invalid password (status 401 with JSON message), check local
-      console.warn('Server login attempt failed or endpoint unreachable, validating locally:', err?.message);
+    } catch {
+      // Fallback for Vercel/offline
     }
 
-    // 2. Resilient Fallback (Guaranteed to work on Vercel, offline, or standalone static deployment)
     const validUser = cleanUser.toLowerCase() === 'admin';
     const storedPass = authStorage.getStoredPass();
     const validPass = cleanPass === 'admin' || cleanPass === storedPass;
@@ -197,7 +210,6 @@ export const api = {
       const res = await fetchJson<{ isAuthenticated: boolean; user?: any }>('/api/auth/verify');
       if (res && res.isAuthenticated) return res;
     } catch {
-      // Vercel / serverless fallback: if valid session token exists
       if (token.startsWith('admin_session_') || token.length >= 10) {
         return {
           isAuthenticated: true,
@@ -223,78 +235,76 @@ export const api = {
     }
   },
 
-  // Admin WebApps CRUD with seamless Vercel fallback
+  // Admin WebApps CRUD: saves to local AND pushes to global cloud so Vercel updates in real-time
   createApp: async (data: Partial<WebApp>): Promise<WebApp> => {
-    try {
-      const created = await fetchJson<WebApp>('/api/apps', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
-      const current = getLocalApps();
-      const updated = [...current, created];
-      saveLocalApps(updated);
-      return created;
-    } catch {
-      // Vercel local fallback
-      const current = getLocalApps();
-      const newApp: WebApp = {
-        id: 'app-' + Date.now(),
-        title: (data.title || '').trim(),
-        url: (data.url || '').trim(),
-        iconType: data.iconType || 'preset',
-        iconName: data.iconName || 'Gamepad2',
-        iconColor: data.iconColor || 'red',
-        iconUrl: data.iconUrl,
-        order: current.length + 1,
-        clicks: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      const updated = [...current, newApp];
-      saveLocalApps(updated);
-      return newApp;
-    }
+    const current = getLocalApps();
+    const newApp: WebApp = {
+      id: 'app-' + Date.now(),
+      title: (data.title || '').trim(),
+      url: (data.url || '').trim(),
+      iconType: data.iconType || 'preset',
+      iconName: data.iconName || 'Gamepad2',
+      iconColor: data.iconColor || 'red',
+      iconUrl: data.iconUrl,
+      order: current.length + 1,
+      clicks: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    const updated = [...current, newApp];
+    saveLocalApps(updated);
+
+    // Sync to Cloud
+    cloudSync.saveToCloud(updated).catch(() => {});
+
+    // Try backend if present
+    fetchJson<WebApp>('/api/apps', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }).catch(() => {});
+
+    return newApp;
   },
 
   updateApp: async (id: string, data: Partial<WebApp>): Promise<WebApp> => {
-    try {
-      const updated = await fetchJson<WebApp>(`/api/apps/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      });
-      const current = getLocalApps();
-      const index = current.findIndex(a => a.id === id);
-      if (index !== -1) {
-        current[index] = updated;
-        saveLocalApps(current);
-      }
-      return updated;
-    } catch {
-      const current = getLocalApps();
-      const index = current.findIndex(a => a.id === id);
-      if (index === -1) throw new Error('WebApp tidak dijumpai.');
-      const updated: WebApp = {
-        ...current[index],
-        ...data,
-        id,
-        updatedAt: new Date().toISOString()
-      };
-      current[index] = updated;
-      saveLocalApps(current);
-      return updated;
-    }
+    const current = getLocalApps();
+    const index = current.findIndex(a => a.id === id);
+    if (index === -1) throw new Error('WebApp tidak dijumpai.');
+
+    const updated: WebApp = {
+      ...current[index],
+      ...data,
+      id,
+      updatedAt: new Date().toISOString()
+    };
+    current[index] = updated;
+    saveLocalApps(current);
+
+    // Sync to Cloud
+    cloudSync.saveToCloud(current).catch(() => {});
+
+    // Try backend if present
+    fetchJson<WebApp>(`/api/apps/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }).catch(() => {});
+
+    return updated;
   },
 
   deleteApp: async (id: string): Promise<{ success: boolean; message: string }> => {
-    try {
-      await fetchJson<{ success: boolean; message: string }>(`/api/apps/${id}`, {
-        method: 'DELETE',
-      });
-    } catch {
-      // ignore
-    }
     const current = getLocalApps().filter(a => a.id !== id);
     saveLocalApps(current);
+
+    // Sync to Cloud
+    cloudSync.saveToCloud(current).catch(() => {});
+
+    // Try backend if present
+    fetchJson<{ success: boolean; message: string }>(`/api/apps/${id}`, {
+      method: 'DELETE',
+    }).catch(() => {});
+
     return { success: true, message: 'Berjaya dipadam.' };
   },
 
@@ -313,16 +323,53 @@ export const api = {
     appMap.forEach(item => reordered.push(item));
     saveLocalApps(reordered);
 
-    try {
-      await fetchJson<{ success: boolean; apps: WebApp[] }>('/api/apps/reorder', {
-        method: 'POST',
-        body: JSON.stringify({ appIds }),
-      });
-    } catch {
-      // ignore
-    }
+    // Sync to Cloud
+    cloudSync.saveToCloud(reordered).catch(() => {});
+
+    // Try backend if present
+    fetchJson<{ success: boolean; apps: WebApp[] }>('/api/apps/reorder', {
+      method: 'POST',
+      body: JSON.stringify({ appIds }),
+    }).catch(() => {});
 
     return { success: true, apps: reordered };
+  },
+
+  importApps: async (incomingApps: WebApp[], replace: boolean = true): Promise<WebApp[]> => {
+    const current = getLocalApps();
+    let finalApps: WebApp[] = [];
+    if (replace) {
+      finalApps = incomingApps;
+    } else {
+      const existingIds = new Set(current.map(a => a.id));
+      const newItems = incomingApps.filter(a => !existingIds.has(a.id));
+      finalApps = [...current, ...newItems];
+    }
+    // Re-index orders
+    finalApps = finalApps.map((item, idx) => ({ ...item, order: idx + 1 }));
+    saveLocalApps(finalApps);
+    cloudSync.saveToCloud(finalApps).catch(() => {});
+    fetchJson('/api/backup/import', {
+      method: 'POST',
+      body: JSON.stringify({ backupData: { apps: finalApps } }),
+    }).catch(() => {});
+    return finalApps;
+  },
+
+  // Manual Trigger to force sync from cloud
+  syncFromCloudNow: async (): Promise<WebApp[]> => {
+    const cloudApps = await cloudSync.fetchFromCloud();
+    if (cloudApps && Array.isArray(cloudApps)) {
+      saveLocalApps(cloudApps);
+      return cloudApps;
+    }
+    return getLocalApps();
+  },
+
+  // Manual Trigger to push to cloud
+  syncToCloudNow: async (apps: WebApp[]): Promise<boolean> => {
+    saveLocalApps(apps);
+    return await cloudSync.saveToCloud(apps);
   },
 
   updateSettings: async (settings: Partial<WebsiteSettings> & { newPassword?: string }): Promise<WebsiteSettings> => {
