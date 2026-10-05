@@ -1,0 +1,39 @@
+{
+  "settings": {
+    "siteName": "SIR AMEIR PLAYGROUND",
+    "tagline": "All my educational and interactive webapps in one place.",
+    "ownerName": "Sir Ameir",
+    "ownerBio": "Pendidik & Pembangun WebApp",
+    "ownerAvatar": "",
+    "announcementText": "Selamat datang ke SIR AMEIR PLAYGROUND!",
+    "announcementActive": false,
+    "announcementType": "info",
+    "maintenanceMode": false,
+    "footerText": "© SIR AMEIR PLAYGROUND",
+    "contactEmail": "AmeirAdha4@gmail.com",
+    "socialLinks": {},
+    "adminUsername": "admin",
+    "adminPasswordHash": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918"
+  },
+  "categories": [
+    {
+      "id": "cat-all",
+      "name": "Semua WebApp",
+      "slug": "all",
+      "icon": "Gamepad2",
+      "description": "Semua koleksi webapp",
+      "color": "from-red-500 to-yellow-500",
+      "order": 1
+    }
+  ],
+  "apps": [],
+  "logs": [
+    {
+      "id": "log-init",
+      "action": "SETTINGS_UPDATED",
+      "details": "Sistem SIR AMEIR PLAYGROUND dimulakan dengan pangkalan data bersih.",
+      "timestamp": "2026-10-04T21:27:00.000Z",
+      "ip": "127.0.0.1"
+    }
+  ]
+}
