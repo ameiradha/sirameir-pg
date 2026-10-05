@@ -11,8 +11,11 @@ import {
   LogOut,
   Download,
   Upload,
+  Copy,
+  Check,
   Gamepad2,
-  CheckCircle2
+  CheckCircle2,
+  Info
 } from 'lucide-react';
 import { WebApp, WebsiteSettings, AuthState } from '../../types';
 import { AppIcon } from '../../lib/iconHelper';
@@ -51,6 +54,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [newPassword, setNewPassword] = useState('');
   const [savingSettings, setSavingSettings] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;
 
@@ -70,12 +74,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(apps, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `sir-ameir-playground-apps-${new Date().toISOString().split('T')[0]}.json`);
+    downloadAnchor.setAttribute("download", `defaultApps.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
-    setNotice('Fail sandaran webapp berjaya dimuat turun!');
+    setNotice('Fail defaultApps.json berjaya dimuat turun!');
     setTimeout(() => setNotice(null), 3000);
+  };
+
+  const handleCopyJSON = () => {
+    navigator.clipboard.writeText(JSON.stringify(apps, null, 2));
+    setCopied(true);
+    setNotice('Kod JSON webapp disalin ke papan keratan (clipboard)!');
+    setTimeout(() => {
+      setCopied(false);
+      setNotice(null);
+    }, 3000);
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -160,7 +174,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
 
         {/* Tab Buttons */}
-        <div className="flex items-center justify-between px-6 py-3 bg-amber-50 border-b-2 border-yellow-300">
+        <div className="flex flex-wrap items-center justify-between px-6 py-3 bg-amber-50 border-b-2 border-yellow-300 gap-2">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setActiveTab('apps')}
@@ -181,20 +195,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
           </div>
 
-          {/* Backup Export / Import */}
+          {/* Backup & Portability Actions */}
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleCopyJSON}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white hover:bg-yellow-100 text-slate-800 border border-yellow-300 text-xs font-bold transition shadow-sm"
+              title="Salin JSON senarai webapp untuk Vercel"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-blue-600" />}
+              <span>{copied ? 'Disalin!' : 'Salin JSON'}</span>
+            </button>
+
             <button
               onClick={handleExport}
               className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white hover:bg-yellow-100 text-slate-800 border border-yellow-300 text-xs font-bold transition shadow-sm"
-              title="Muat turun fail sandaran JSON untuk disimpan"
+              title="Muat turun defaultApps.json untuk Vercel / Sandaran"
             >
               <Download className="w-3.5 h-3.5 text-red-600" />
-              <span className="hidden sm:inline">Eksport Sandaran</span>
+              <span>Eksport JSON</span>
             </button>
 
             <label className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white hover:bg-yellow-100 text-slate-800 border border-yellow-300 text-xs font-bold transition shadow-sm cursor-pointer">
               <Upload className="w-3.5 h-3.5 text-yellow-600" />
-              <span className="hidden sm:inline">Import Sandaran</span>
+              <span>Import Sandaran</span>
               <input type="file" accept=".json" onChange={handleImport} className="hidden" />
             </label>
           </div>
@@ -204,8 +227,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
           
           {notice && (
-            <div className="mb-4 p-3 rounded-2xl bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <div className="mb-4 p-3 rounded-2xl bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center gap-2 animate-fadeIn">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>{notice}</span>
             </div>
           )}
@@ -224,6 +247,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <Plus className="w-4 h-4" />
                   <span>Tambah WebApp Baru</span>
                 </button>
+              </div>
+
+              {/* Vercel Tip Notice */}
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-yellow-300 text-xs text-yellow-900 flex items-start gap-2.5">
+                <Info className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                <div className="leading-relaxed">
+                  <strong>Peringatan Vercel:</strong> Semua webapp yang anda tambah atau padam di sini disimpan terus ke memori peranti anda. Anda juga boleh menekan butang <strong>"Eksport JSON"</strong> atau <strong>"Salin JSON"</strong> di bahagian atas untuk memindahkan senarai aplikasi ke mana-mana komputer, telefon pintar, atau fail projek Vercel bila-bila masa!
+                </div>
               </div>
 
               {apps.length === 0 ? (
