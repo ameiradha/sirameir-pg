@@ -1,5 +1,6 @@
 import { WebApp, WebsiteSettings } from '../types';
 import defaultAppsList from '../data/defaultApps.json';
+import { firestoreService } from './firestoreService';
 import { cloudSync } from './cloudSync';
 
 const TOKEN_KEY = 'sir_ameir_playground_token';
@@ -101,6 +102,17 @@ async function fetchJson<T>(url: string, options: RequestInit = {}): Promise<T> 
 
 export const api = {
   getSettings: async (): Promise<WebsiteSettings> => {
+    // Try Firestore first
+    try {
+      const firestoreSettings = await firestoreService.getSettings();
+      if (firestoreSettings && firestoreSettings.siteName) {
+        saveLocalSettings(firestoreSettings);
+        return firestoreSettings;
+      }
+    } catch {
+      // ignore
+    }
+
     try {
       const settings = await fetchJson<WebsiteSettings>('/api/settings');
       saveLocalSettings(settings);
@@ -110,40 +122,47 @@ export const api = {
     }
   },
 
-  // Get apps with automatic Cloud Sync between Vercel and AI Studio
+  // Get apps: Firebase Firestore -> Cloud Sync -> Local backend -> Local cache
   getApps: async (): Promise<WebApp[]> => {
-    // 1. Try global cloud database first (guarantees sync between Vercel and AI Studio)
+    // 1. Primary: Firebase Firestore
+    try {
+      const firestoreApps = await firestoreService.getApps();
+      if (Array.isArray(firestoreApps) && firestoreApps.length > 0) {
+        saveLocalApps(firestoreApps);
+        return firestoreApps;
+      }
+    } catch (e) {
+      console.warn('Firestore fetch failed, checking secondary sources:', e);
+    }
+
+    // 2. Secondary: Global Cloud Sync
     try {
       const cloudApps = await cloudSync.fetchFromCloud();
       if (cloudApps && Array.isArray(cloudApps) && cloudApps.length > 0) {
         saveLocalApps(cloudApps);
-        // Also update local backend if present
-        fetchJson('/api/apps/reorder', {
-          method: 'POST',
-          body: JSON.stringify({ appIds: cloudApps.map(a => a.id) })
-        }).catch(() => {});
+        firestoreService.saveAllApps(cloudApps).catch(() => {});
         return cloudApps;
       }
     } catch {
       // ignore
     }
 
-    // 2. Try local backend
+    // 3. Tertiary: Local backend
     try {
       const apps = await fetchJson<WebApp[]>('/api/apps');
       if (Array.isArray(apps) && apps.length > 0) {
         saveLocalApps(apps);
-        cloudSync.saveToCloud(apps).catch(() => {});
+        firestoreService.saveAllApps(apps).catch(() => {});
         return apps;
       }
     } catch {
       // ignore
     }
 
-    // 3. Fallback to cached local apps or default catalogue
+    // 4. Fallback to cached local apps or default catalogue
     const local = getLocalApps();
     if (local.length > 0) {
-      cloudSync.saveToCloud(local).catch(() => {});
+      firestoreService.saveAllApps(local).catch(() => {});
     }
     return local;
   },
@@ -158,6 +177,7 @@ export const api = {
       if (item) {
         item.clicks = clicks;
         saveLocalApps(current);
+        firestoreService.saveApp(item).catch(() => {});
       }
       return { success: true, clicks };
     }
@@ -235,17 +255,18 @@ export const api = {
     }
   },
 
-  // Admin WebApps CRUD: saves to local AND pushes to global cloud so Vercel updates in real-time
+  // Admin WebApps CRUD: Persists directly into Firebase Firestore + local + cloudSync
   createApp: async (data: Partial<WebApp>): Promise<WebApp> => {
     const current = getLocalApps();
+    const cleanId = 'app-' + Date.now();
     const newApp: WebApp = {
-      id: 'app-' + Date.now(),
+      id: cleanId,
       title: (data.title || '').trim(),
       url: (data.url || '').trim(),
       iconType: data.iconType || 'preset',
       iconName: data.iconName || 'Gamepad2',
       iconColor: data.iconColor || 'red',
-      iconUrl: data.iconUrl,
+      iconUrl: data.iconUrl || '',
       order: current.length + 1,
       clicks: 0,
       createdAt: new Date().toISOString(),
@@ -255,7 +276,12 @@ export const api = {
     const updated = [...current, newApp];
     saveLocalApps(updated);
 
-    // Sync to Cloud
+    // Save directly to Firebase Firestore
+    firestoreService.saveApp(newApp).catch(err => {
+      console.warn('Firebase saveApp failed:', err);
+    });
+
+    // Secondary backup
     cloudSync.saveToCloud(updated).catch(() => {});
 
     // Try backend if present
@@ -281,7 +307,12 @@ export const api = {
     current[index] = updated;
     saveLocalApps(current);
 
-    // Sync to Cloud
+    // Update Firebase Firestore
+    firestoreService.saveApp(updated).catch(err => {
+      console.warn('Firebase updateApp failed:', err);
+    });
+
+    // Secondary backup
     cloudSync.saveToCloud(current).catch(() => {});
 
     // Try backend if present
@@ -297,7 +328,12 @@ export const api = {
     const current = getLocalApps().filter(a => a.id !== id);
     saveLocalApps(current);
 
-    // Sync to Cloud
+    // Delete from Firebase Firestore
+    firestoreService.deleteApp(id).catch(err => {
+      console.warn('Firebase deleteApp failed:', err);
+    });
+
+    // Secondary backup
     cloudSync.saveToCloud(current).catch(() => {});
 
     // Try backend if present
@@ -323,7 +359,12 @@ export const api = {
     appMap.forEach(item => reordered.push(item));
     saveLocalApps(reordered);
 
-    // Sync to Cloud
+    // Save batch to Firebase Firestore
+    firestoreService.saveAllApps(reordered).catch(err => {
+      console.warn('Firebase reorder save failed:', err);
+    });
+
+    // Secondary backup
     cloudSync.saveToCloud(reordered).catch(() => {});
 
     // Try backend if present
@@ -348,28 +389,44 @@ export const api = {
     // Re-index orders
     finalApps = finalApps.map((item, idx) => ({ ...item, order: idx + 1 }));
     saveLocalApps(finalApps);
+
+    // Batch save all to Firebase Firestore
+    firestoreService.saveAllApps(finalApps).catch(err => {
+      console.warn('Firebase import save failed:', err);
+    });
+
     cloudSync.saveToCloud(finalApps).catch(() => {});
+
     fetchJson('/api/backup/import', {
       method: 'POST',
       body: JSON.stringify({ backupData: { apps: finalApps } }),
     }).catch(() => {});
+
     return finalApps;
   },
 
-  // Manual Trigger to force sync from cloud
+  // Manual Trigger to force sync from Firestore
   syncFromCloudNow: async (): Promise<WebApp[]> => {
-    const cloudApps = await cloudSync.fetchFromCloud();
-    if (cloudApps && Array.isArray(cloudApps)) {
-      saveLocalApps(cloudApps);
-      return cloudApps;
-    }
+    try {
+      const firestoreApps = await firestoreService.getApps();
+      if (Array.isArray(firestoreApps) && firestoreApps.length > 0) {
+        saveLocalApps(firestoreApps);
+        return firestoreApps;
+      }
+    } catch {}
     return getLocalApps();
   },
 
-  // Manual Trigger to push to cloud
+  // Manual Trigger to push to Firestore
   syncToCloudNow: async (apps: WebApp[]): Promise<boolean> => {
     saveLocalApps(apps);
-    return await cloudSync.saveToCloud(apps);
+    try {
+      await firestoreService.saveAllApps(apps);
+      await cloudSync.saveToCloud(apps);
+      return true;
+    } catch {
+      return false;
+    }
   },
 
   updateSettings: async (settings: Partial<WebsiteSettings> & { newPassword?: string }): Promise<WebsiteSettings> => {
@@ -383,6 +440,9 @@ export const api = {
       ...settings
     };
     saveLocalSettings(updated);
+
+    // Save to Firestore
+    firestoreService.saveSettings(updated).catch(() => {});
 
     try {
       return await fetchJson<WebsiteSettings>('/api/settings', {

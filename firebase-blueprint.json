@@ -1,0 +1,131 @@
+{
+  "entities": {
+    "WebApp": {
+      "title": "WebApp",
+      "description": "An educational or interactive web application entry",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the webapp"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the web application",
+          "maxLength": 100
+        },
+        "url": {
+          "type": "string",
+          "description": "Direct URL link to the application",
+          "maxLength": 2048
+        },
+        "iconType": {
+          "type": "string",
+          "description": "Type of icon: preset, image, or emoji",
+          "maxLength": 20
+        },
+        "iconName": {
+          "type": "string",
+          "description": "Lucide icon name if using preset icon",
+          "maxLength": 50
+        },
+        "iconColor": {
+          "type": "string",
+          "description": "Color theme for the icon badge",
+          "maxLength": 30
+        },
+        "iconUrl": {
+          "type": "string",
+          "description": "Image URL or Base64 data URI of the custom uploaded logo"
+        },
+        "order": {
+          "type": "number",
+          "description": "Sorting sequence order number"
+        },
+        "clicks": {
+          "type": "number",
+          "description": "Total launch count"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when webapp was created"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when webapp was last updated"
+        }
+      },
+      "required": ["id", "title", "url"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "General playground website settings",
+      "type": "object",
+      "properties": {
+        "siteName": {
+          "type": "string",
+          "description": "Name of the playground site",
+          "maxLength": 100
+        },
+        "tagline": {
+          "type": "string",
+          "description": "Site tagline",
+          "maxLength": 300
+        },
+        "ownerName": {
+          "type": "string",
+          "description": "Owner name",
+          "maxLength": 100
+        },
+        "ownerBio": {
+          "type": "string",
+          "description": "Owner biography",
+          "maxLength": 300
+        },
+        "ownerAvatar": {
+          "type": "string",
+          "description": "Owner avatar URL"
+        },
+        "announcementText": {
+          "type": "string",
+          "description": "Announcement banner content",
+          "maxLength": 500
+        },
+        "announcementActive": {
+          "type": "boolean",
+          "description": "Whether announcement is visible"
+        },
+        "announcementType": {
+          "type": "string",
+          "description": "Type of announcement banner",
+          "maxLength": 20
+        },
+        "maintenanceMode": {
+          "type": "boolean",
+          "description": "Whether maintenance mode is turned on"
+        },
+        "footerText": {
+          "type": "string",
+          "description": "Footer copyright text",
+          "maxLength": 200
+        },
+        "contactEmail": {
+          "type": "string",
+          "description": "Contact email address",
+          "maxLength": 100
+        }
+      },
+      "required": ["siteName"]
+    }
+  },
+  "firestore": {
+    "/apps/{appId}": {
+      "schema": "WebApp",
+      "description": "Collection of educational webapps accessible to all visitors"
+    },
+    "/settings/{settingId}": {
+      "schema": "Settings",
+      "description": "Site configurations and metadata"
+    }
+  }
+}

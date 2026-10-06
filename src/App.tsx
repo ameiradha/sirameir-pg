@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { WebApp, WebsiteSettings, AuthState } from './types';
 import { api, authStorage } from './lib/api';
+import { firestoreService } from './lib/firestoreService';
 import { Header } from './components/Header';
 import { HeroBanner } from './components/HeroBanner';
 import { AppGrid } from './components/AppGrid';
@@ -130,6 +131,17 @@ export default function App() {
   useEffect(() => {
     loadData();
     document.title = 'SIR AMEIR PLAYGROUND';
+
+    // Real-time listener for Firebase Firestore
+    const unsubscribe = firestoreService.subscribeToApps((realtimeApps) => {
+      if (realtimeApps && Array.isArray(realtimeApps) && realtimeApps.length > 0) {
+        saveAppsState(realtimeApps);
+      }
+    });
+
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
   }, []);
 
   const handleLaunchApp = (app: WebApp) => {
