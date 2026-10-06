@@ -256,7 +256,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-amber-50/30 text-slate-900 flex flex-col selection:bg-yellow-400 selection:text-red-950 font-sans">
+    <div className="min-h-screen bg-white text-neutral-900 flex flex-col selection:bg-black selection:text-white font-sans antialiased">
       
       {/* Header */}
       <Header

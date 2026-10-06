@@ -27,33 +27,33 @@ export const PWAInstallButton: React.FC = () => {
       <button
         onClick={handleInstallClick}
         title="Pasang aplikasi ke telefon / desktop anda"
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-yellow-950 border border-yellow-500 text-xs font-bold transition shadow-sm active:scale-95"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-black border border-neutral-300 text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer"
       >
-        <Download className="w-3.5 h-3.5 text-red-700" />
+        <Download className="w-3.5 h-3.5 text-black" />
         <span className="hidden sm:inline">Pasang PWA</span>
       </button>
 
       {showIOSGuide && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="w-full max-w-sm rounded-3xl bg-white border-4 border-yellow-400 p-6 shadow-2xl text-slate-900 relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fadeIn">
+          <div className="w-full max-w-sm rounded-2xl bg-white border border-neutral-300 p-6 shadow-2xl text-neutral-900 relative">
             <button
               onClick={() => setShowIOSGuide(false)}
-              className="absolute top-4 right-4 p-1.5 rounded-xl bg-yellow-100 hover:bg-yellow-200 text-slate-700 transition"
+              className="absolute top-4 right-4 p-1.5 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-800 transition cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
 
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-2xl bg-red-600 flex items-center justify-center text-white shadow-md">
-                <Apple className="w-6 h-6" />
+              <div className="w-10 h-10 rounded-xl bg-black flex items-center justify-center text-white shadow-xs">
+                <Apple className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900">Pasang di iPhone / iPad</h3>
-                <p className="text-xs text-slate-500 font-bold">SIR AMEIR PLAYGROUND</p>
+                <h3 className="text-base font-bold text-black">Pasang di iPhone / iPad</h3>
+                <p className="text-xs text-neutral-500 font-bold">SIR AMEIR PLAYGROUND</p>
               </div>
             </div>
 
-            <div className="space-y-3 my-4 text-xs text-slate-700 font-medium">
+            <div className="space-y-3 my-4 text-xs text-neutral-700 font-medium">
               <p>1. Buka di <strong>Safari</strong> dan tekan butang <strong>Share (Kongsi)</strong> ⎋.</p>
               <p>2. Pilih <strong>Add to Home Screen</strong> (Tambah ke Skrin Utama).</p>
               <p>3. Tekan <strong>Add</strong> di penjuru atas kanan.</p>
@@ -61,7 +61,7 @@ export const PWAInstallButton: React.FC = () => {
 
             <button
               onClick={() => setShowIOSGuide(false)}
-              className="w-full mt-2 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition shadow-md"
+              className="w-full mt-2 py-2.5 rounded-xl bg-black hover:bg-neutral-800 text-white font-bold text-xs transition shadow-xs cursor-pointer"
             >
               Faham
             </button>

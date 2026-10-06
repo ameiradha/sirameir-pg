@@ -64,25 +64,46 @@ const ICON_MAP: Record<string, React.ElementType> = {
 };
 
 export const COLOR_VARIANTS: Record<string, { bg: string; text: string; ring: string }> = {
+  black: {
+    bg: 'bg-black text-white',
+    text: 'text-white',
+    ring: 'border-black shadow-sm'
+  },
+  neutral: {
+    bg: 'bg-neutral-100 text-neutral-900',
+    text: 'text-neutral-900',
+    ring: 'border-neutral-300 shadow-sm'
+  },
+  dark: {
+    bg: 'bg-neutral-900 text-white',
+    text: 'text-white',
+    ring: 'border-neutral-800 shadow-sm'
+  },
+  white: {
+    bg: 'bg-white text-black',
+    text: 'text-black',
+    ring: 'border-neutral-300 shadow-sm'
+  },
+  // Backward compatibility with previous color keys
   red: {
-    bg: 'bg-red-50 text-red-600',
-    text: 'text-red-600',
-    ring: 'border-red-200 shadow-sm'
+    bg: 'bg-black text-white',
+    text: 'text-white',
+    ring: 'border-black shadow-sm'
   },
   yellow: {
-    bg: 'bg-yellow-50 text-yellow-600',
-    text: 'text-yellow-600',
-    ring: 'border-yellow-300 shadow-sm'
+    bg: 'bg-neutral-100 text-neutral-900',
+    text: 'text-neutral-900',
+    ring: 'border-neutral-300 shadow-sm'
   },
   amber: {
-    bg: 'bg-amber-50 text-amber-600',
-    text: 'text-amber-600',
-    ring: 'border-amber-200 shadow-sm'
+    bg: 'bg-neutral-900 text-white',
+    text: 'text-white',
+    ring: 'border-black shadow-sm'
   },
   rose: {
-    bg: 'bg-rose-50 text-rose-600',
-    text: 'text-rose-600',
-    ring: 'border-rose-200 shadow-sm'
+    bg: 'bg-neutral-100 text-neutral-900',
+    text: 'text-neutral-900',
+    ring: 'border-neutral-300 shadow-sm'
   }
 };
 
@@ -99,7 +120,7 @@ interface AppIconProps {
 
 export const AppIcon: React.FC<AppIconProps> = ({
   name = 'Gamepad2',
-  color = 'red',
+  color = 'black',
   iconType = 'preset',
   iconUrl,
   className = '',
@@ -126,12 +147,12 @@ export const AppIcon: React.FC<AppIconProps> = ({
     xl: 'w-14 h-14'
   }[size];
 
-  const colorStyle = COLOR_VARIANTS[color] || COLOR_VARIANTS.red;
+  const colorStyle = COLOR_VARIANTS[color] || COLOR_VARIANTS.black;
 
-  // For custom uploaded image logo: MUST fit and fill the white square completely (p-0, object-cover, full bleed)
+  // Custom uploaded image logo: Full-bleed square, fits completely inside
   if (iconType === 'image' && iconUrl) {
     return (
-      <div className={`relative overflow-hidden flex items-center justify-center bg-white border-2 border-yellow-400 shadow-md ${containerDimensions} ${className}`}>
+      <div className={`relative overflow-hidden flex items-center justify-center bg-white border border-neutral-300 shadow-sm ${containerDimensions} ${className}`}>
         <img
           src={iconUrl}
           alt="Logo WebApp"

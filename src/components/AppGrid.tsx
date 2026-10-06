@@ -26,7 +26,7 @@ export const AppGrid: React.FC<AppGridProps> = ({
         <div className="my-8 text-center">
           <button
             onClick={onAddNewApp}
-            className="px-6 py-3 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm shadow-md transition flex items-center gap-2 mx-auto active:scale-95"
+            className="px-6 py-3 rounded-xl bg-black hover:bg-neutral-800 text-white font-bold text-sm shadow-sm transition flex items-center gap-2 mx-auto active:scale-95 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Tambah WebApp</span>

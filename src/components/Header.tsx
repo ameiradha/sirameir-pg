@@ -17,7 +17,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAddApp
 }) => {
   return (
-    <header className="sticky top-0 z-40 w-full bg-white border-b-4 border-red-600 shadow-sm">
+    <header className="sticky top-0 z-40 w-full bg-white border-b border-neutral-200 shadow-xs">
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-16 sm:h-20">
           
@@ -28,14 +28,14 @@ export const Header: React.FC<HeaderProps> = ({
             className="group flex items-center gap-3 text-left focus:outline-none select-none cursor-pointer"
             title="Klik 5 kali untuk akses Admin Portal"
           >
-            <div className="w-11 h-11 rounded-2xl bg-yellow-400 border-2 border-yellow-500 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
-              <Gamepad2 className="w-6 h-6 text-red-700" />
+            <div className="w-10 h-10 rounded-xl bg-black text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
+              <Gamepad2 className="w-5 h-5 text-white" />
             </div>
             <div>
-              <div className="text-lg sm:text-xl font-black tracking-tight text-red-600 uppercase font-mono leading-none">
+              <div className="text-base sm:text-lg font-black tracking-tight text-black uppercase font-mono leading-none">
                 SIR AMEIR
               </div>
-              <div className="text-xs sm:text-sm font-black tracking-widest text-yellow-600 uppercase leading-tight">
+              <div className="text-[11px] sm:text-xs font-bold tracking-widest text-neutral-500 uppercase leading-tight mt-0.5">
                 PLAYGROUND
               </div>
             </div>
@@ -49,15 +49,15 @@ export const Header: React.FC<HeaderProps> = ({
               <>
                 <button
                   onClick={onOpenAddApp}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-yellow-950 font-bold text-xs shadow-sm border border-yellow-500 transition active:scale-95"
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-black font-bold text-xs border border-neutral-300 transition active:scale-95"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-4 h-4 text-black" />
                   <span className="hidden sm:inline">Tambah WebApp</span>
                 </button>
 
                 <button
                   onClick={onOpenAdmin}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-sm transition active:scale-95"
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-black hover:bg-neutral-800 text-white font-bold text-xs shadow-sm transition active:scale-95"
                 >
                   <ShieldCheck className="w-4 h-4" />
                   <span>Admin</span>

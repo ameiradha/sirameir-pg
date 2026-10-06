@@ -19,7 +19,7 @@ export const AppCard: React.FC<AppCardProps> = ({
   onDelete
 }) => {
   return (
-    <div className="group relative rounded-3xl bg-white border-2 border-yellow-300 hover:border-red-500 p-6 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col items-center text-center justify-between">
+    <div className="group relative rounded-2xl bg-white border border-neutral-200 hover:border-black p-6 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col items-center text-center justify-between">
       
       {/* Admin Quick Action Buttons */}
       {isAdmin && (
@@ -30,7 +30,7 @@ export const AppCard: React.FC<AppCardProps> = ({
                 e.stopPropagation();
                 onEdit(app);
               }}
-              className="p-1.5 rounded-lg bg-yellow-100 hover:bg-yellow-200 text-yellow-900 transition"
+              className="p-1.5 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-black border border-neutral-200 transition"
               title="Edit WebApp"
             >
               <Edit2 className="w-3.5 h-3.5" />
@@ -44,7 +44,7 @@ export const AppCard: React.FC<AppCardProps> = ({
                   onDelete(app.id);
                 }
               }}
-              className="p-1.5 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 transition"
+              className="p-1.5 rounded-lg bg-neutral-100 hover:bg-black hover:text-white text-neutral-700 border border-neutral-200 transition"
               title="Padam WebApp"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -57,7 +57,7 @@ export const AppCard: React.FC<AppCardProps> = ({
       <div className="my-2">
         <AppIcon
           name={app.iconName || 'Gamepad2'}
-          color={app.iconColor || 'red'}
+          color={app.iconColor || 'black'}
           iconType={app.iconType || 'preset'}
           iconUrl={app.iconUrl}
           size="lg"
@@ -65,15 +65,15 @@ export const AppCard: React.FC<AppCardProps> = ({
       </div>
 
       {/* 2. Tajuk WebApp */}
-      <h3 className="text-lg font-extrabold text-slate-900 mt-3 mb-5 line-clamp-2 leading-tight">
+      <h3 className="text-base sm:text-lg font-bold text-black mt-3 mb-5 line-clamp-2 leading-tight">
         {app.title}
       </h3>
 
-      {/* 3. Butang Buka WebApp (Direct Redirect) */}
+      {/* 3. Butang Buka WebApp */}
       <button
         type="button"
         onClick={() => onLaunch(app)}
-        className="w-full py-3 px-5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-black text-sm shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 active:scale-95"
+        className="w-full py-2.5 px-4 rounded-xl bg-black hover:bg-neutral-800 text-white font-bold text-sm shadow-xs hover:shadow transition-all duration-200 flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
       >
         <span>Buka WebApp</span>
         <ExternalLink className="w-4 h-4" />
