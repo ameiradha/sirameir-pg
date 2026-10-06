@@ -17,8 +17,8 @@ export default defineConfig(() => {
           name: 'SIR AMEIR PLAYGROUND',
           short_name: 'PLAYGROUND',
           description: 'All my educational and interactive webapps in one place.',
-          theme_color: '#0f172a',
-          background_color: '#0f172a',
+          theme_color: '#ffffff',
+          background_color: '#ffffff',
           display: 'standalone',
           orientation: 'any',
           start_url: '/',
@@ -48,19 +48,17 @@ export default defineConfig(() => {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
         },
         devOptions: {
-          enabled: true,
-          type: 'module',
+          enabled: false,
         },
       }),
     ],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve('.'),
       },
     },
     server: {
-      hmr: process.env.DISABLE_HMR !== 'true',
-      watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      hmr: false,
     },
   };
 });
