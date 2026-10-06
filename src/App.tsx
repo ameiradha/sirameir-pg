@@ -10,6 +10,7 @@ import { AppFormModal } from './components/Admin/AppFormModal';
 import { LoginModal } from './components/Admin/LoginModal';
 import { Footer } from './components/Footer';
 import { OfflineIndicator } from './components/OfflineIndicator';
+import defaultAppsList from './data/defaultApps.json';
 
 const LOCAL_STORAGE_APPS_KEY = 'sir_ameir_cached_apps';
 
@@ -17,10 +18,16 @@ export default function App() {
   const [apps, setApps] = useState<WebApp[]>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_APPS_KEY);
-      return saved ? JSON.parse(saved) : [];
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
     } catch {
-      return [];
+      // ignore
     }
+    return Array.isArray(defaultAppsList) && defaultAppsList.length > 0
+      ? (defaultAppsList as WebApp[])
+      : [];
   });
 
   const [settings, setSettings] = useState<WebsiteSettings>({
@@ -95,15 +102,23 @@ export default function App() {
         if (serverApps.length > 0) {
           saveAppsState(serverApps);
         } else {
-          // If server returned empty, check if we have cached apps to restore
+          // If server returned empty, check if we have cached apps or default apps to restore
           const cached = localStorage.getItem(LOCAL_STORAGE_APPS_KEY);
           if (cached) {
             try {
               const parsed = JSON.parse(cached);
               if (Array.isArray(parsed) && parsed.length > 0) {
                 setApps(parsed);
+              } else if (Array.isArray(defaultAppsList) && defaultAppsList.length > 0) {
+                setApps(defaultAppsList as WebApp[]);
               }
-            } catch {}
+            } catch {
+              if (Array.isArray(defaultAppsList) && defaultAppsList.length > 0) {
+                setApps(defaultAppsList as WebApp[]);
+              }
+            }
+          } else if (Array.isArray(defaultAppsList) && defaultAppsList.length > 0) {
+            setApps(defaultAppsList as WebApp[]);
           }
         }
       }

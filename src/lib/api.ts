@@ -21,7 +21,7 @@ export function getLocalApps(): WebApp[] {
     const raw = localStorage.getItem(APPS_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
   } catch {
     // ignore
@@ -287,7 +287,7 @@ export const api = {
     // Try backend if present
     fetchJson<WebApp>('/api/apps', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(newApp),
     }).catch(() => {});
 
     return newApp;
@@ -318,7 +318,7 @@ export const api = {
     // Try backend if present
     fetchJson<WebApp>(`/api/apps/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(data),
+      body: JSON.stringify(updated),
     }).catch(() => {});
 
     return updated;

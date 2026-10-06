@@ -103,6 +103,17 @@ function readDatabase(): DatabaseSchema {
     const parsed = JSON.parse(data);
     if (!parsed.settings) parsed.settings = INITIAL_DATABASE.settings;
     if (!Array.isArray(parsed.apps)) parsed.apps = [];
+    if (parsed.apps.length === 0) {
+      const defaultAppsPath = path.resolve('src/data/defaultApps.json');
+      if (fs.existsSync(defaultAppsPath)) {
+        try {
+          const defaults = JSON.parse(fs.readFileSync(defaultAppsPath, 'utf8'));
+          if (Array.isArray(defaults) && defaults.length > 0) {
+            parsed.apps = defaults;
+          }
+        } catch {}
+      }
+    }
     if (!parsed.settings.adminUsername) parsed.settings.adminUsername = 'admin';
 
     return parsed;
@@ -260,7 +271,7 @@ app.post('/api/apps', requireAdminAuth, (req: Request, res: Response) => {
   const maxOrder = db.apps.reduce((max, a) => Math.max(max, a.order || 0), 0);
 
   const newApp = {
-    id: 'app-' + Date.now(),
+    id: (req.body.id && typeof req.body.id === 'string' && req.body.id.trim()) ? req.body.id.trim() : 'app-' + Date.now(),
     title: title.trim(),
     url: url.trim(),
     iconType,
